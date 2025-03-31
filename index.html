@@ -1,51 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Talking Head - minimal example</title>
-
-  <style>
-    body, html { width:100%; height:100%; max-width: 800px; margin: auto; position: relative; background-color: #202020; color: white; }
-    #avatar { display: block; width:100%; height:100%; }
-    #controls { display: block; position: absolute; top: 10px; left: 10px; right: 10px; height: 50px; }
-    #text { position: absolute; width: Calc( 100% - 110px ); height: 100%; top: 0; left: 0; bottom: 0; right: 110px; font-family: Arial; font-size: 20px; }
-    #speak { display: block; position: absolute; top: 0; bottom: 0; right: 0; height: 100%; width: 100px; font-family: Arial; font-size: 20px; }
-    #loading { display: block; position: absolute; bottom: 10px; left: 10px; right: 10px; height: 50px; font-family: Arial; font-size: 20px; }
-  </style>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talking Head - Modern UI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  
   <script type="importmap">
-  { "imports":
-    {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js/+esm",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
-      "talkinghead": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/modules/talkinghead.mjs"
+    { "imports":
+      {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js/+esm",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+        "talkinghead": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/modules/talkinghead.mjs"
+      }
     }
-  }
   </script>
+</head>
+
+<body class="bg-gray-900 text-white flex flex-col items-center justify-center h-screen">
+  <div id="avatar" class="w-full h-3/4 rounded-lg shadow-lg overflow-hidden"></div>
+  
+  <div id="controls" class="mt-6 flex w-full max-w-xl gap-4">
+    <input id="text" type="text" class="flex-1 p-3 text-lg bg-gray-800 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Type something...">
+    <button id="speak" class="px-6 py-3 bg-blue-600 text-white text-lg rounded-lg shadow hover:bg-blue-700 transition">Speak</button>
+  </div>
+  
+  <div id="loading" class="mt-4 text-lg font-semibold"></div>
 
   <script type="module">
     import { TalkingHead } from "talkinghead";
 
     let head;
 
-    document.addEventListener('DOMContentLoaded', async function(e) {
-
-      // Instantiate the class
-      // NOTE: Never put your API key in a client-side code unless you know
-      //       that you are the only one to have access to that code!
+    document.addEventListener('DOMContentLoaded', async function() {
       const nodeAvatar = document.getElementById('avatar');
-      head = new TalkingHead( nodeAvatar, {
+      head = new TalkingHead(nodeAvatar, {
         ttsEndpoint: "https://eu-texttospeech.googleapis.com/v1beta1/text:synthesize",
-        ttsApikey: "AIzaSyDKnQEdeUyNeFMQciUkHDuX4AbeplQyuWg", // <- Change this
-        
+        ttsApikey: "AIzaSyDKnQEdeUyNeFMQciUkHDuX4AbeplQyuWg", 
         lipsyncModules: ["en", "fi"],
         cameraView: "upper"
       });
 
-      // Load and show the avatar
       const nodeLoading = document.getElementById('loading');
       try {
         nodeLoading.textContent = "Loading...";
-        await head.showAvatar( {
+        await head.showAvatar({
           url: 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown&textureSizeLimit=1024&textureFormat=png',
           body: 'F',
           avatarMood: 'neutral',
@@ -53,51 +52,31 @@
           ttsVoice: "en-GB-Standard-A",
           lipsyncLang: 'en'
         }, (ev) => {
-          if ( ev.lengthComputable ) {
-            let val = Math.min(100,Math.round(ev.loaded/ev.total * 100 ));
+          if (ev.lengthComputable) {
+            let val = Math.min(100, Math.round(ev.loaded / ev.total * 100));
             nodeLoading.textContent = "Loading " + val + "%";
           }
         });
         nodeLoading.style.display = 'none';
       } catch (error) {
-        console.log(error);
+        console.error(error);
         nodeLoading.textContent = error.toString();
       }
 
-      // Speak when clicked
-      const nodeSpeak = document.getElementById('speak');
-      nodeSpeak.addEventListener('click', function () {
-        try {
-          const text = document.getElementById('text').value;
-          if ( text ) {
-            head.speakText( text );
-          }
-        } catch (error) {
-          console.log(error);
-        }
+      document.getElementById('speak').addEventListener('click', () => {
+        const text = document.getElementById('text').value;
+        if (text) head.speakText(text);
       });
 
-      // Pause animation when document is not visible
-      document.addEventListener("visibilitychange", async function (ev) {
-        if (document.visibilityState === "visible") {
-          head.start();
-        } else {
-          head.stop();
-        }
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") head.start();
+        else head.stop();
       });
-
     });
-
   </script>
-</head>
 
-<body>
-  <div id="avatar"></div>
-  <div id="controls">
-    <input id="text" type="text" value="Hi there. I am kimi , I am creations of Rikesh Dahal.">
-    <input id="speak" type="button" value="Speak">
-  </div>
-  <div id="loading"></div>
+  <footer class="mt-6 text-gray-400 text-sm">
+    © 2025 <a href="https://rikeshdahal.com.np" class="text-blue-400 hover:underline">Rikesh Dahal</a>. All rights reserved.
+  </footer>
 </body>
-
 </html>
