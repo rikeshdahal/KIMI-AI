@@ -3,123 +3,405 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Webcam Analysis</title>
+    <title>RikeshAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js/+esm",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+                "talkinghead": "https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@1.3/modules/talkinghead.mjs"
+            }
+        }
+    </script>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f0f0f0; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        .video-container { position: relative; width: 100%; max-width: 640px; margin: 20px 0; }
-        video, canvas { width: 100%; height: auto; border-radius: 4px; }
-        .controls { margin: 20px 0; }
-        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background-color: #0056b3; }
-        input { padding: 8px; width: 60%; margin-left: 10px; border: 1px solid #ddd; border-radius: 4px; }
-        .response { margin-top: 20px; padding: 15px; background-color: #f8f9fa; border-radius: 4px; }
+        .draggable { cursor: grab; transition: transform 0.3s ease-in-out; }
+        .hidden-camera { transform: scale(0); opacity: 0; transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out; }
+        .chat-container { width: 100%; max-width: 400px; max-height: 500px; overflow-y: auto; background: linear-gradient(135deg, #1f2937, #374151); border-radius: 12px; padding: 15px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); display: none; position: absolute; left: 10px; bottom: 80px; }
+        .chat-message { margin: 8px 0; padding: 10px; border-radius: 8px; word-wrap: break-word; color: #fff; font-size: 14px; }
+        .user-message { background: #3b82f6; text-align: right; }
+        .kimi-message { background: #10b981; }
+        .chat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .chat-header button { background: #ef4444; padding: 5px; border-radius: 50%; border: none; cursor: pointer; }
+        .recording-status { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); text-align: center; background: rgba(0, 0, 0, 0.7); padding: 5px 15px; border-radius: 8px; }
+        .vision-response { position: absolute; bottom: 60px; right: 10px; background: rgba(0, 0, 0, 0.7); padding: 10px; border-radius: 8px; color: white; max-width: 300px; }
+        @media (max-width: 768px) {
+            .chat-container { max-width: 90%; max-height: 60vh; bottom: 60px; left: 5px; right: 5px; }
+            .vision-response { bottom: 120px; right: 5px; max-width: 90%; font-size: 14px; }
+            .absolute { position: relative; }
+            .bottom-4 { bottom: 10px; }
+            .left-4 { left: 10px; }
+            .w-32 { width: 100px; }
+            .h-32 { height: 100px; }
+        }
+        @media (max-width: 480px) {
+            .chat-container { padding: 10px; }
+            .vision-response { bottom: 100px; padding: 8px; }
+            .flex.space-x-4 { flex-wrap: wrap; gap: 8px; }
+        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>What's in my hand?</h1>
-        <div class="video-container">
-            <video id="video" autoplay playsinline></video>
-            <canvas id="canvas" style="display: none;"></canvas>
+<body class="bg-black text-white flex items-center justify-center h-screen p-4">
+    <div class="relative w-full h-full max-w-5xl max-h-5xl bg-yellow-600 rounded-lg shadow-lg overflow-hidden">
+        <button class="absolute top-2 right-2 text-white text-xl" onclick="window.open('', '_self', ''); window.close();">
+            <i class="fas fa-times"></i>
+        </button>
+        <div id="avatar" class="w-full h-full"></div>
+        <button id="toggleCameraBtn" class="absolute top-2 left-2 bg-gray-700 p-2 text-white rounded-full">
+            <i class="fas fa-video"></i>
+        </button>
+        <div id="videoContainer" class="absolute bottom-4 right-4 w-32 h-32 bg-gray-800 rounded-lg shadow-md draggable">
+            <video id="userVideo" class="w-full h-full object-cover rounded-lg" autoplay></video>
         </div>
-        <div class="controls">
-            <button id="captureBtn">Capture Image</button>
-            <input type="text" id="prompt" value="What is in my hand?" placeholder="Enter your prompt">
+        <div class="absolute bottom-4 left-4 flex space-x-4">
+            <button id="micToggleBtn" class="bg-gray-800 p-3 rounded-full text-white hover:scale-110">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <button id="chatToggleBtn" class="bg-gray-800 p-3 rounded-full text-white hover:scale-110">
+                <i class="fas fa-comment"></i>
+            </button>
+            <button id="stopSpeakingBtn" class="bg-gray-800 p-3 rounded-full text-white hover:scale-110">
+                <i class="fas fa-hand"></i>
+            </button>
         </div>
-        <div class="response">
-            <h2>Response:</h2>
-            <p id="responseText">Waiting for analysis...</p>
+        <div class="absolute bottom-4 right-4 flex space-x-4">
+            <button id="soundToggleBtn" class="bg-gray-800 p-3 rounded-full text-white hover:scale-110">
+                <i class="fas fa-volume-up"></i>
+            </button>
+        </div>
+        <div id="chatContainer" class="chat-container draggable">
+            <div class="chat-header">
+                <span>Chat History</span>
+                <button id="clearChatBtn" title="Clear Chat"><i class="fas fa-trash"></i></button>
+            </div>
+            <div id="chatMessages"></div>
+            <div id="userInputContainer" class="flex space-x-2 mt-2 hidden">
+                <input type="text" id="userInput" class="w-full p-2 text-black rounded" placeholder="Type here or ask about what I see...">
+                <button id="sendMessageBtn" class="bg-blue-500 p-2 rounded-full text-white hover:scale-110">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+                <button id="captureBtn" class="bg-green-500 p-2 rounded-full text-white hover:scale-110">
+                    <i class="fas fa-camera"></i>
+                </button>
+            </div>
+        </div>
+        <div class="recording-status">
+            <div id="is_recording">Recording: False</div>
+            <div id="recognized_text">Text: </div>
+        </div>
+        <div class="vision-response hidden">
+            <div id="responseText">Vision: Waiting for analysis...</div>
+        </div>
+    </div>
+    <div class="column hidden">
+        <div id="avatars" class="rowWrap">
+            <label for="avatar-name-file" class="command" data-avatar-name="FILE">
+                <svg viewBox="-2 -2 28 28" xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M4 1.5C2.89543 1.5 2 2.39543 2 3.5V4.5C2 4.55666 2.00236 4.61278 2.00698 4.66825C0.838141 5.07811 0 6.19118 0 7.5V19.5C0 21.1569 1.34315 22.5 3 22.5H21C22.6569 22.5 24 21.1569 24 19.5V7.5C24 5.84315 22.6569 4.5 21 4.5H11.874C11.4299 2.77477 9.86384 1.5 8 1.5H4ZM9.73244 4.5C9.38663 3.9022 8.74028 3.5 8 3.5H4V4.5H9.73244ZM3 6.5C2.44772 6.5 2 6.94772 2 7.5V19.5C2 20.0523 2.44772 20.5 3 20.5H21C21.5523 20.5 22 20.0523 22 19.5V7.5C22 6.94772 21.5523 6.5 21 6.5H3Z" fill="currentColor" />
+                </svg>
+            </label>
+            <input type="file" id="avatar-name-file" accept=".glb" style="display:none">
         </div>
     </div>
 
-    <script>
-        class GeminiVisionSystem {
-            constructor() {
-                this.video = document.getElementById('video');
-                this.canvas = document.getElementById('canvas');
-                this.captureBtn = document.getElementById('captureBtn');
-                this.promptInput = document.getElementById('prompt');
-                this.responseText = document.getElementById('responseText');
-                this.context = this.canvas.getContext('2d');
-                this.apiKey = 'AIzaSyAY4c_mp20hKDh1SAwDhsad4plD9AxRZVM'; // Replace with your actual key
-                // Updated endpoint as of 2025 - verify with current Google AI docs
-                this.apiEndpoint = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent';
-                
-                this.initializeCamera();
-                this.setupEventListeners();
-            }
+    <script type="module">
+        import { TalkingHead } from "talkinghead";
+        let head, micEnabled = false, soundEnabled = true, chatVisible = false, currentStream, currentCamera = 0, chatHistory = [], recognition, isSpeaking = false, lastVisionResult = "";
+        let captureAndAnalyze; // Declare globally
 
-            async initializeCamera() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    this.video.srcObject = stream;
-                } catch (error) {
-                    console.error('Error accessing camera:', error);
-                    this.responseText.textContent = 'Error: Unable to access camera';
+        document.addEventListener('DOMContentLoaded', async () => {
+            const nodeAvatar = document.getElementById('avatar');
+            head = new TalkingHead(nodeAvatar, {
+                ttsEndpoint: "https://eu-texttospeech.googleapis.com/v1beta1/text:synthesize",
+                ttsApikey: "AIzaSyDKnQEdeUyNeFMQciUkHDuX4AbeplQyuWg",
+                lipsyncModules: ["en"],
+                cameraView: "upper"
+            });
+
+            await head.showAvatar({
+                url: 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb?morphTargets=ARKit,Oculus+Visemes,mouthOpen,mouthSmile,eyesClosed,eyesLookUp,eyesLookDown&textureSizeLimit=1024&textureFormat=png',
+                body: 'F', avatarMood: 'neutral', ttsLang: "en-GB", ttsVoice: "en-GB-Standard-A", lipsyncLang: 'en'
+            });
+
+            document.getElementById("micToggleBtn").addEventListener("click", toggleMic);
+            document.getElementById("soundToggleBtn").addEventListener("click", toggleSound);
+            document.getElementById("sendMessageBtn").addEventListener("click", sendMessage);
+            document.getElementById("toggleCameraBtn").addEventListener("click", toggleCamera);
+            document.getElementById("chatToggleBtn").addEventListener("click", toggleChat);
+            document.getElementById("clearChatBtn").addEventListener("click", clearChatHistory);
+            document.getElementById("stopSpeakingBtn").addEventListener("click", stopSpeaking);
+            document.getElementById("captureBtn").addEventListener("click", () => captureAndAnalyze());
+
+            startUserVideo();
+            makeDraggable(document.getElementById("videoContainer"));
+            makeDraggable(document.getElementById("chatContainer"));
+            loadChatHistory();
+            setupSpeechRecognition();
+            initializeVisionSystem();
+        });
+
+        function toggleMic() {
+            micEnabled = !micEnabled;
+            document.getElementById("micToggleBtn").innerHTML = micEnabled ? '<i class="fas fa-microphone-slash"></i>' : '<i class="fas fa-microphone"></i>';
+            if (micEnabled && !isSpeaking && recognition) {
+                recognition.start();
+                document.getElementById("is_recording").innerHTML = "Recording: True";
+            } else if (recognition) {
+                recognition.stop();
+                document.getElementById("is_recording").innerHTML = "Recording: False";
+                document.getElementById("recognized_text").innerHTML = "Text: ";
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById("soundToggleBtn").innerHTML = soundEnabled ? '<i class="fas fa-volume-up"></i>' : '<i class="fas fa-volume-mute"></i>';
+            head.setMute(!soundEnabled);
+        }
+
+        function toggleChat() {
+            chatVisible = !chatVisible;
+            const chatContainer = document.getElementById("chatContainer");
+            const userInputContainer = document.getElementById("userInputContainer");
+            chatContainer.style.display = chatVisible ? "block" : "none";
+            userInputContainer.classList.toggle("hidden", !chatVisible);
+        }
+
+        function stopSpeaking() {
+            head.stopSpeaking();
+            isSpeaking = false;
+            if (micEnabled && recognition) {
+                recognition.start();
+                document.getElementById("is_recording").innerHTML = "Recording: True";
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById("userInput").value;
+            if (input.trim() !== "") {
+                addToChatHistory("user", input);
+                document.getElementById("userInput").value = "";
+                let aiResponse = await getKimiResponse(input);
+                addToChatHistory("kimi", aiResponse);
+                if (soundEnabled) {
+                    isSpeaking = true;
+                    if (recognition) {
+                        recognition.stop();
+                        document.getElementById("is_recording").innerHTML = "Recording: False";
+                    }
+                    await head.speakText(aiResponse);
+                    isSpeaking = false;
+                    if (micEnabled && recognition) {
+                        recognition.start();
+                        document.getElementById("is_recording").innerHTML = "Recording: True";
+                    }
                 }
             }
+        }
 
-            setupEventListeners() {
-                this.captureBtn.addEventListener('click', () => this.captureAndAnalyze());
+        async function getKimiResponse(text) {
+            const apiKey = "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";
+            const url = "https://api.groq.com/openai/v1/chat/completions";
+            const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` };
+            const visionContext = lastVisionResult ? `Based on recent vision analysis: ${lastVisionResult}\n\n` : "";
+            const body = JSON.stringify({
+                model: "llama-3.3-70b-versatile",
+                messages: [
+                    { role: "system", content: `Your name is KIMI AI, a 19-year-old girl from Nepal. You are a helpful AI assistant created by Rikesh Dahal and always respond in a loving and romantic style. ${visionContext}` },
+                    { role: "user", content: text }
+                ],
+                temperature: 1,
+                max_tokens: 1024,
+                top_p: 1,
+                stream: false
+            });
+
+            try {
+                const response = await fetch(url, { method: "POST", headers, body });
+                const result = await response.json();
+                return result.choices && result.choices.length > 0 ? result.choices[0].message.content : "Sorry, no response received.";
+            } catch (error) {
+                console.error("Error fetching Groq API:", error);
+                return "Error getting response from AI.";
             }
+        }
 
-            captureImage() {
-                this.canvas.width = this.video.videoWidth;
-                this.canvas.height = this.video.videoHeight;
-                this.context.drawImage(this.video, 0, 0);
-                return this.canvas.toDataURL('image/jpeg').split(',')[1];
+        async function startUserVideo() {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            if (videoDevices.length > 0) {
+                currentCamera = currentCamera % videoDevices.length;
+                navigator.mediaDevices.getUserMedia({ video: { deviceId: videoDevices[currentCamera].deviceId } })
+                    .then(stream => {
+                        if (currentStream) currentStream.getTracks().forEach(track => track.stop());
+                        currentStream = stream;
+                        document.getElementById("userVideo").srcObject = stream;
+                    }).catch(error => console.error("Error accessing webcam:", error));
             }
+        }
 
-            async sendToGemini(imageBase64, prompt) {
+        function toggleCamera() {
+            document.getElementById("videoContainer").classList.toggle("hidden-camera");
+        }
+
+        function makeDraggable(element) {
+            let offsetX, offsetY, isDragging = false;
+            element.style.position = "absolute";
+            element.addEventListener("mousedown", (e) => {
+                isDragging = true;
+                offsetX = e.clientX - element.offsetLeft;
+                offsetY = e.clientY - element.offsetTop;
+                element.style.cursor = "grabbing";
+            });
+            document.addEventListener("mousemove", (e) => {
+                if (isDragging) {
+                    let newX = e.clientX - offsetX;
+                    let newY = e.clientY - offsetY;
+                    newX = Math.max(0, Math.min(window.innerWidth - element.offsetWidth, newX));
+                    newY = Math.max(0, Math.min(window.innerHeight - element.offsetHeight, newY));
+                    element.style.left = `${newX}px`;
+                    element.style.top = `${newY}px`;
+                }
+            });
+            document.addEventListener("mouseup", () => {
+                isDragging = false;
+                element.style.cursor = "grab";
+            });
+        }
+
+        function addToChatHistory(sender, message) {
+            chatHistory.push({ sender, message });
+            saveChatHistory();
+            updateChatDisplay();
+        }
+
+        function updateChatDisplay() {
+            const chatMessages = document.getElementById("chatMessages");
+            chatMessages.innerHTML = "";
+            chatHistory.forEach(({ sender, message }) => {
+                const div = document.createElement("div");
+                div.classList.add("chat-message", sender === "user" ? "user-message" : "kimi-message");
+                div.textContent = message;
+                chatMessages.appendChild(div);
+            });
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function saveChatHistory() {
+            document.cookie = `chatHistory=${JSON.stringify(chatHistory)}; path=/; max-age=86400`;
+        }
+
+        function loadChatHistory() {
+            const cookies = document.cookie.split(";").map(cookie => cookie.trim());
+            const chatCookie = cookies.find(cookie => cookie.startsWith("chatHistory="));
+            if (chatCookie) {
+                chatHistory = JSON.parse(chatCookie.split("=")[1]);
+                updateChatDisplay();
+            }
+        }
+
+        function clearChatHistory() {
+            chatHistory = [];
+            saveChatHistory();
+            updateChatDisplay();
+        }
+
+        function setupSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window)) {
+                console.warn("Speech Recognition API is not supported in this browser.");
+                return;
+            }
+            recognition = new webkitSpeechRecognition();
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            recognition.addEventListener('result', async (event) => {
+                const transcript = Array.from(event.results).map(result => result[0].transcript).join('');
+                document.getElementById("recognized_text").innerHTML = `Text: ${transcript}`;
+                if (event.results[0].isFinal && micEnabled && !chatVisible && !isSpeaking) {
+                    addToChatHistory("user", transcript);
+                    let aiResponse = await getKimiResponse(transcript);
+                    addToChatHistory("kimi", aiResponse);
+                    if (soundEnabled) {
+                        isSpeaking = true;
+                        recognition.stop();
+                        document.getElementById("is_recording").innerHTML = "Recording: False";
+                        await head.speakText(aiResponse);
+                        isSpeaking = false;
+                        if (micEnabled) {
+                            recognition.start();
+                            document.getElementById("is_recording").innerHTML = "Recording: True";
+                        }
+                    }
+                    document.getElementById("recognized_text").innerHTML = "Text: ";
+                } else if (chatVisible) {
+                    document.getElementById("userInput").value = transcript;
+                }
+            });
+            recognition.addEventListener('end', () => {
+                if (micEnabled && !isSpeaking) {
+                    recognition.start();
+                    document.getElementById("is_recording").innerHTML = "Recording: True";
+                }
+            });
+            recognition.addEventListener('start', () => {
+                if (isSpeaking) recognition.stop();
+            });
+        }
+
+        function initializeVisionSystem() {
+            const video = document.getElementById('userVideo');
+            const canvas = document.createElement('canvas');
+            canvas.style.display = 'none';
+            document.body.appendChild(canvas);
+            const responseText = document.getElementById('responseText');
+            const context = canvas.getContext('2d');
+            const apiKey = 'AIzaSyAY4c_mp20hKDh1SAwDhsad4plD9AxRZVM'; 
+            const apiEndpoint = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent';
+
+            captureAndAnalyze = async () => { // Assign to global variable
+                const prompt = document.getElementById('userInput').value || "What do you see?";
+                document.getElementById("captureBtn").disabled = true;
+                responseText.textContent = 'Vision: Analyzing...';
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                context.drawImage(video, 0, 0);
+                const imageBase64 = canvas.toDataURL('image/jpeg').split(',')[1];
+
                 try {
-                    const response = await fetch(`${this.apiEndpoint}?key=${this.apiKey}`, {
+                    const response = await fetch(`${apiEndpoint}?key=${apiKey}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             contents: [{
                                 parts: [
                                     { text: prompt },
-                                    {
-                                        inline_data: {
-                                            mime_type: 'image/jpeg',
-                                            data: imageBase64
-                                        }
-                                    }
+                                    { inline_data: { mime_type: 'image/jpeg', data: imageBase64 } }
                                 ]
                             }]
                         })
                     });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const data = await response.json();
-                    // Updated response parsing based on current API structure
-                    return data.candidates[0].content.parts[0].text;
+                    lastVisionResult = data.candidates[0].content.parts[0].text;
+                    responseText.textContent = `Vision: ${lastVisionResult}`;
+                    addToChatHistory("user", prompt);
+                    const aiResponse = await getKimiResponse(`I just analyzed an image: ${lastVisionResult}. How would you respond to "${prompt}"?`);
+                    addToChatHistory("kimi", aiResponse);
+                    if (soundEnabled) {
+                        isSpeaking = true;
+                        if (recognition) recognition.stop();
+                        await head.speakText(aiResponse);
+                        isSpeaking = false;
+                        if (micEnabled && recognition) recognition.start();
+                    }
                 } catch (error) {
                     console.error('Gemini API error:', error);
-                    return `Error analyzing image with Gemini API: ${error.message}`;
+                    responseText.textContent = `Vision: Error: ${error.message}`;
                 }
-            }
-
-            async captureAndAnalyze() {
-                this.captureBtn.disabled = true;
-                this.responseText.textContent = 'Analyzing...';
-                
-                const imageBase64 = this.captureImage();
-                const prompt = this.promptInput.value;
-                const response = await this.sendToGemini(imageBase64, prompt);
-                
-                this.responseText.textContent = response;
-                this.captureBtn.disabled = false;
-            }
+                document.getElementById("captureBtn").disabled = false;
+            };
         }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            new GeminiVisionSystem();
-        });
     </script>
 </body>
 </html>
