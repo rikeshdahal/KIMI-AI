@@ -24,7 +24,7 @@
         .kimi-message { background: #10b981; }
         .chat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .chat-header button { background: #ef4444; padding: 5px; border-radius: 50%; border: none; cursor: pointer; }
-        .recording-status { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); text-align: center; background: rgba(0, 0, 0, 0.7); padding: 5px 15px; border-radius: 8px; }
+        .recording-status { position: absolute; bottom: 19px; left: 50%; transform: translateX(-50%); text-align: center; background: rgba(0, 0, 0, 0.7); padding: 5px 15px; border-radius: 8px; }
         .vision-response { position: absolute; bottom: 60px; right: 10px; background: rgba(0, 0, 0, 0.7); padding: 10px; border-radius: 8px; color: white; max-width: 300px; }
         @media (max-width: 768px) {
             .chat-container { max-width: 90%; max-height: 60vh; bottom: 60px; left: 5px; right: 5px; }
@@ -70,6 +70,10 @@
                 <i class="fas fa-volume-up"></i>
             </button>
         </div>
+        <div class="absolute bottom-0 flex justify-center w-full">
+            <div>&copy; 2025 <a href="https://rikeshdahal.com.np" target="_blank">Rikesh Dahal</a>. All rights reserved.</div>
+        </div>
+        
         <div id="chatContainer" class="chat-container draggable">
             <div class="chat-header">
                 <span>Chat History</span>
@@ -90,6 +94,7 @@
             <div id="is_recording">Recording: False</div>
             <div id="recognized_text">Text: </div>
         </div>
+        
         <div class="vision-response hidden">
             <div id="responseText">Vision: Waiting for analysis...</div>
         </div>
@@ -102,6 +107,7 @@
                 </svg>
             </label>
             <input type="file" id="avatar-name-file" accept=".glb" style="display:none">
+            
         </div>
     </div>
 
